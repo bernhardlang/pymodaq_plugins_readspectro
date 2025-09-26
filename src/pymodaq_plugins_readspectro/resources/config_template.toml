@@ -1,0 +1,5 @@
+title = 'This is the configuration file of the extension plugin readspectro'
+
+[presets]
+default_preset_for_readspectro = "preset_avantes"
+preset_for_readspectro = "preset_avantes"
