@@ -12,24 +12,7 @@ from pymodaq.utils.data import DataToExport, DataFromPlugins
 from pymodaq_gui.utils.custom_app import CustomApp
 from pymodaq_gui.plotting.data_viewers.viewer1D import Viewer1D
 from pymodaq_gui.utils.dock import DockArea, Dock
-
-
-class MainWindow(QMainWindow):
-
-    """Derived MainWindow class which permits to intercept close events
-    during measurement"""
-
-    def __init__(self):
-        QMainWindow.__init__(self)
-        self.close_enabled = True
-
-    def enable_close(self, enable):
-        self.close_enabled = enable
-
-    def closeEvent(self, event):
-        if self.close_enabled:
-            self.application.clean_up()
-            QMainWindow.closeEvent(self, event)
+from pymodaq_gui.utils.main_window import MainWindow
 
 
 RAW             = 0
