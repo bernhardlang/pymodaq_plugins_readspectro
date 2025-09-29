@@ -107,8 +107,6 @@ class DAQ_1DViewer_MockSpectro(DAQ_Viewer_base):
         self.controller.close_communication()
         initialized = False
 
-        return initialized
-
     def grab_data(self, Naverage=1, **kwargs):
         """Start grabbing from the detector
         Use a synchrone acquisition (blocking function)

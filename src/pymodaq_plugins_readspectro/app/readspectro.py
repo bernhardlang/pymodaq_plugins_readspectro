@@ -152,6 +152,9 @@ class SpectroApp(CustomApp):
         self.detector.settings.child('detector_settings', 'integration_time')\
             .setValue(self.settings.child('integration_time').value())
 
+        self.mainwindow.set_shutdown_callback(self.detector.quit_fun)
+        self.detector.grab_status.connect(self.mainwindow.disable_close)
+        
     def setup_actions(self):
         self.add_action('acquire', 'Acquire', 'spectrumAnalyzer',
                         "Acquire", checkable=False, toolbar=self.toolbar)
@@ -330,8 +333,7 @@ class SpectroApp(CustomApp):
         """Start acquisition"""
 
         if self.acquiring: # rather stop it
-            self.acquiring = False
-            self.detector.stop_grab()
+            self.stop_acquiring()
             return
 
         self.acquiring = True
@@ -404,6 +406,10 @@ class SpectroApp(CustomApp):
             for value in spectrum:
                 self.data_file.write(self.format_string.format(val = value))
         self.data_file.write('\n')
+
+    def stop_acquiring(self):
+        self.acquiring = False
+        self.detector.stop_grab()
 
     def take_background(self):
         """Grab one background spectrum."""
