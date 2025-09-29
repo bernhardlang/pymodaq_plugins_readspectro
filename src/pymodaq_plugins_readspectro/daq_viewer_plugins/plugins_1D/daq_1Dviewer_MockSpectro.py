@@ -10,32 +10,30 @@ from pymodaq_plugins_avantes.hardware.AvaSpec_ULS2048CL_EVO_Controller \
 
 
 class DAQ_1DViewer_MockSpectro(DAQ_Viewer_base):
-    """ Avantes Spectrometer Instrument plugin class for a 1D viewer.
-    Besides acquiring spectral data, the Avantes device may control ten digital
-    output lines. They are exposed to PyMoDAQ as parameters. Acquisition on
-    digital and analog input lines is not yet supported.
+    """Simulated Spectrometer Instrument plugin class for a 1D viewer.
+
+    Besides testing spectrometer applications, this plugin permits to simulate
+    real detectors with realistic noise settings.
     """
 
-    # define controller type for easy autocompletion
+    # no controller, all simulation is done within this class
     controller_type = None
 
     params = comon_parameters+[
-        {'title': 'Integration time [ms]', 'name': 'integration_time',
+        {'title': 'Integration time [sec]', 'name': 'integration_time',
          'type': 'float', 'min': 0.001, 'value': 1,
          'tip': 'Integration time in seconds' },
         {'title': 'Number of pixels', 'name': 'n_pixels', 'type': 'int',
          'min': 1, 'value': 500 },
-#        {'title': 'Number of dark pixels', 'name': 'n_dark_pixels',
-#         'type': 'int', 'min': 0, 'value': 0 },
         {'title': 'Readout noise [LSB]', 'name': 'readout_noise',
          'type': 'float', 'min': 0, 'value': 4,
          'tip': 'Acquisition noise in LSB' },
         {'title': 'Dark level [LSB/µs]:', 'name': 'dark_level',
-         'type': 'float', 'min': 0, 'value': 2,
-         'tip': 'Dark signal per microsecond in LSB' },
+         'type': 'float', 'min': 0, 'value': 2e3,
+         'tip': 'Dark signal per second in LSB' },
         {'title': 'Light level [LSB]', 'name': 'light_level',
-         'type': 'float', 'min': 0, 'value': 32,
-         'tip': 'Signal per microsecond in LSB' },
+         'type': 'float', 'min': 0, 'value': 32e3,
+         'tip': 'Signal per second in LSB' },
         {'title': 'Conversion [PE/LSB]', 'name': 'pe_per_lsb',
          'type': 'float', 'min': 1, 'value': 18.3,
          'tip': 'Photo electrons per LSB' },
@@ -52,10 +50,10 @@ class DAQ_1DViewer_MockSpectro(DAQ_Viewer_base):
     ]
 
     def ini_attributes(self):
-        self.controller = self
         self.x_axis = None
+        # virtual shutter support
         self.dark_shutter_open = True
-        self.reference_switch = True
+        self.reference_switch = True # bypass switch around sample cell
 
     def commit_settings(self, param: Parameter):
         pass
@@ -136,7 +134,6 @@ class DAQ_1DViewer_MockSpectro(DAQ_Viewer_base):
         n_pixels = self.settings.child("n_pixels").value()
         integration = self.settings.child("integration_time").value()
         time.sleep(integration)
-        integration *= 1e3
         data = \
             np.random.normal(loc=self.settings.child("dark_level").value()
                              * integration,

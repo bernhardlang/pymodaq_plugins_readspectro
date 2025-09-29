@@ -148,6 +148,10 @@ class SpectroApp(CustomApp):
         self.detector.detector = self.plugin
         self.detector.init_hardware()
 
+        # is this the right place / way?
+        self.detector.settings.child('detector_settings', 'integration_time')\
+            .setValue(self.settings.child('integration_time').value())
+
     def setup_actions(self):
         self.add_action('acquire', 'Acquire', 'spectrumAnalyzer',
                         "Acquire", checkable=False, toolbar=self.toolbar)
@@ -181,7 +185,7 @@ class SpectroApp(CustomApp):
         if param.name() == "integration_time":
             self.detector.settings.child('detector_settings',
                                          'integration_time') \
-                                  .setValue(param.value() * 1000)
+                                  .setValue(param.value())
             # background and reference should be measurement with the same i.t.
             if self.measurement_mode in [WITH_BACKGROUND, ABSORPTION]:
                 self.detector.stop()
