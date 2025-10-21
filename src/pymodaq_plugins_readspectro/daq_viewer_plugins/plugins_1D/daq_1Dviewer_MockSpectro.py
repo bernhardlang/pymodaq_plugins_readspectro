@@ -89,15 +89,15 @@ class DAQ_1DViewer_MockSpectro(DAQ_Viewer_base):
             self.absorption = \
                 self.settings.child("absorption").value() \
                 * np.exp(-((pixels - n_pixels / 4) / (n_pixels / 8))**2)
-                                     
+
             self.x_axis = Axis(label='Wavelength', units='nm',
                                 data=self.wavelengths, index=0)
-            dfp = DataFromPlugins(name='MockSpectro',
-                                  data=[np.zeros(len(self.wavelengths))],
-                                  dim='Data1D', axes=[self.x_axis],
-                                  labels=['MockSpectro-Signal'])
-            self.dte_signal_temp.emit(DataToExport(name='MockSpectro',
-                                                   data=[dfp]))
+            #dfp = DataFromPlugins(name='MockSpectro',
+            #                      data=[np.zeros(len(self.wavelengths))],
+            #                      dim='Data1D', axes=[self.x_axis],
+            #                      labels=['MockSpectro-Signal'])
+            #self.dte_signal_temp.emit(DataToExport(name='MockSpectro',
+            #                                       data=[dfp]))
 
         return "MockSpectro initialised", True
 
@@ -117,18 +117,23 @@ class DAQ_1DViewer_MockSpectro(DAQ_Viewer_base):
             Number of hardware averaging.
         """
 
-        data, timestamp = self.grab_spectrum()
+        spectrum, time_stamp = self.simulate_spectrum()
 
-        dwa0D_timestamp = \
-            DataRaw('timestamp', units='dimensionless',
-                    data=np.array([timestamp]))
+#        dwa0D_timestamp = \
+#            DataRaw('timestamp', units='dimensionless',
+#                    data=np.array([timestamp]))
 
-        dfp = DataFromPlugins(name='MockSpectro', data=data, dim='Data1D',
-                              labels=['spectrum'], axes=[self.x_axis])
+        dfp_spectrum = \
+            DataFromPlugins(name='MockSpectro', data=spectrum, dim='Data1D',
+                            labels=['spectrum'], axes=[self.x_axis])
+        dfp_time_stamp = \
+            DataFromPlugins(name='TimeStamp', data=time_stamp, dim='Data0D',
+                            labels=['time stamp'])
+        
         self.dte_signal.emit(DataToExport(name='spectrum',
-                                          data=[dfp, dwa0D_timestamp]))
+                                          data=[dfp_spectrum, dfp_time_stamp]))
 
-    def grab_spectrum(self):
+    def simulate_spectrum(self):
         n_pixels = self.settings.child("n_pixels").value()
         integration = self.settings.child("integration_time").value()
         time.sleep(integration)
@@ -148,6 +153,9 @@ class DAQ_1DViewer_MockSpectro(DAQ_Viewer_base):
         data = np.where(data < max_adc, np.floor(data), max_adc)
 
         return data, time.time()
+
+    def grab_spectrum(self):
+        return self.simulate_spectrum()
 
     def stop(self):
         pass
