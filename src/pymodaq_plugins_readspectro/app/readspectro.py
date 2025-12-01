@@ -281,7 +281,7 @@ class SpectroApp(CustomApp):
             absorption = np.where(valid_mask,
                                   -np.log10(signal[0] / self.reference), 0)
             dfp = DataFromPlugins(name='absorption', data=[absorption],
-                              dim='Data1D', labels=['absorption'])
+                                  dim='Data1D', labels=['absorption'])
             self.spectrum_viewer.show_data(dfp)
             dfp = DataFromPlugins(name='raw',
                                   data=[signal[0], self.reference],

@@ -5,8 +5,6 @@ from pymodaq.utils.data import DataFromPlugins, Axis, DataToExport, DataRaw
 from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base, \
     comon_parameters, main
 from pymodaq.utils.parameter import Parameter
-from pymodaq_plugins_avantes.hardware.AvaSpec_ULS2048CL_EVO_Controller \
-    import AvantesController, AvantesSimuController
 
 
 class DAQ_1DViewer_MockSpectro(DAQ_Viewer_base):
