@@ -6,6 +6,7 @@ from qtpy.QtWidgets import QMainWindow, QWidget, QApplication, QProgressBar, \
     QFileDialog
 from pyqtgraph import GraphicsLayoutWidget, PlotDataItem, FillBetweenItem
 from pyqtgraph import PlotItem, PlotDataItem, ViewBox
+from pyqtgraph.dockarea import DockLabel
 from pyqtgraph import GraphicsWidget, PlotWidget
 from pymodaq.control_modules.daq_viewer import DAQ_Viewer
 from pymodaq.utils.data import DataToExport, DataFromPlugins
@@ -104,11 +105,14 @@ class SpectroApp(CustomApp):
         self.docks['settings'].addWidget(self.settings_tree)
 
         # main area with spectrum plot
-        spectrum_dock = Dock('Data')
+        self.spectrum_label = DockLabel("Raw Data")
+        spectrum_dock = Dock('Data', label=self.spectrum_label)
         self.docks['spectrum'] = \
-            self.dockarea.addDock(spectrum_dock, "right", self.docks['settings'])
+            self.dockarea.addDock(spectrum_dock, "right",
+                                  self.docks['settings'])
         spectrum_widget = QWidget()
         self.spectrum_viewer = Viewer1D(spectrum_widget)
+        self.spectrum_viewer.toolbar.hide()
         spectrum_dock.addWidget(spectrum_widget)
 
         # progress bar for time sequence
@@ -156,22 +160,26 @@ class SpectroApp(CustomApp):
         self.detector.grab_status.connect(self.mainwindow.disable_close)
         
     def setup_actions(self):
-        self.add_action('acquire', 'Acquire', 'spectrumAnalyzer',
+        self.add_action('acquire', 'Acquire', 'run2',
                         "Acquire", checkable=False, toolbar=self.toolbar)
-        self.add_action('background', 'Take Background', 'camera',
+        self.add_action('stop', 'Stop', 'stop',
+                        "Stop", checkable=False, toolbar=self.toolbar)
+        self.add_action('background', 'Take Background', './half-moon.png',
                         "Take Background", checkable=False, toolbar=self.toolbar)
-        self.add_action('reference', 'Take Reference', 'camera',
+        self.add_action('reference', 'Take Reference', './sun.png',
                         "Take Reference", checkable=False, toolbar=self.toolbar)
         self.add_action('save', 'Save', 'SaveAs', "Save current data",
                         checkable=False, toolbar=self.toolbar)        
         self.add_action('show', 'Show/hide', 'read2', "Show Hide DAQViewer",
                         checkable=True, toolbar=self.toolbar)
+        self._actions["stop"].setEnabled(False)
 
     def connect_things(self):
         self.quit_action.triggered.connect(self.mainwindow.close)
         self.connect_action('save', self.save_current_data)
         self.connect_action('show', self.show_detector)
         self.connect_action('acquire', self.start_acquiring)
+        self.connect_action('stop', self.stop_acquiring)
         self.connect_action('background', self.take_background)
         self.connect_action('reference', self.take_reference)
         self.detector.grab_done_signal.connect(self.show_data)
@@ -216,11 +224,19 @@ class SpectroApp(CustomApp):
 
     def adjust_operation(self):
         """Stop acquisition if background / reference is missing but needed"""
-        if self.measurement_mode >= WITH_BACKGROUND:
+        if self.measurement_mode < WITH_BACKGROUND:
+            dock_title = "Raw Data"
+        else:
+            dock_title = "Absorption" if self.measurement_mode == ABSORPTION \
+                else "Background Subtracted Data"
             if not self.have_background:
                 self.detector.stop()
             elif self.measurement_mode == ABSORPTION and not self.have_reference:
                 self.detector.stop()
+
+        #self.spectrum_dock.setTitle(dock_title)
+        #self.spectrum_dock.setObjectName("spectrum-doc")
+        self.spectrum_label.setText(dock_title)
 
     def adjust_actions(self):
         """Disable actions which need other actions to be performed first.
@@ -332,10 +348,8 @@ class SpectroApp(CustomApp):
     def start_acquiring(self):
         """Start acquisition"""
 
-        if self.acquiring: # rather stop it
-            self.stop_acquiring()
-            return
-
+        self._actions["acquire"].setEnabled(False)
+        self._actions["stop"].setEnabled(True)
         self.acquiring = True
         if self.scan_mode == CONTINUOUS:
             self.detector.grab() # just go
@@ -408,6 +422,8 @@ class SpectroApp(CustomApp):
         self.data_file.write('\n')
 
     def stop_acquiring(self):
+        self._actions["acquire"].setEnabled(True)
+        self._actions["stop"].setEnabled(False)
         self.acquiring = False
         self.detector.stop_grab()
 
@@ -521,6 +537,7 @@ def main():
 
     prog = SpectroApp(dockarea, plugin=plugin)
     mainwindow.application = prog # not very clean, could be done by event filter
+    mainwindow.set_shutdown_callback(prog.quit_function)
     mainwindow.show()
 
     app.exec()
