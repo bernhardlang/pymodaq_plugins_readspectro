@@ -34,8 +34,8 @@ class SpectroApp(CustomApp):
     visible_params = { CONTINUOUS: [], LINEAR: ['linear_step', 'scan_end'],
                        LIN_LOG: scan_params }
 
-    params = [{'name': 'integration_time', 'title': 'Integration Time [sec]',
-               'type': 'float', 'min': 0.001, 'max': 100, 'value': 0.05,
+    params = [{'name': 'integration_time', 'title': 'Integration Time [ms]',
+               'type': 'float', 'min': 1, 'max': 10000, 'value': 500,
                'tip': 'Integration time in seconds'},
               {'name': 'averaging', 'title': 'Averaging',
                'type': 'int', 'min': 1, 'max': 1000, 'value': 1,
@@ -414,7 +414,7 @@ class SpectroApp(CustomApp):
     def take_background(self):
         """Grab one background spectrum."""
 
-        if self.detector.controller.has_dark_shutter:
+        if hasattr(self.detector.controller, "open_dark_shutter"):
             self.detector.controller.open_dark_shutter(False)
 
         n_average = \
@@ -430,13 +430,13 @@ class SpectroApp(CustomApp):
                               labels=['background'])
         self.spectrum_viewer.show_data(dfp)
         self.background_viewer.show_data(dfp)
-        if self.detector.controller.has_dark_shutter:
+        if hasattr(self.detector.controller, "open_dark_shutter"):
             self.detector.controller.open_dark_shutter(True)
 
     def take_reference(self):
         """Grab one reference spectrum."""
 
-        if self.detector.controller.has_reference_switch:
+        if hasattr(self.detector.controller, "set_reference_switch"):
             self.detector.controller.set_reference_switch(True)
 
         n_average = \
@@ -462,7 +462,7 @@ class SpectroApp(CustomApp):
                               labels=['reference'])
         self.raw_data_viewer.show_data(dfp)
 
-        if self.detector.controller.has_reference_switch:
+        if hasattr(self.detector.controller, "set_reference_switch"):
             self.detector.controller.set_reference_switch(False)
 
 
