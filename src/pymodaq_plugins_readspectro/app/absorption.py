@@ -262,6 +262,7 @@ class SpectroApp(CustomApp):
     def start_acquiring(self):
         """Start acquisition"""
 
+        self.docks['settings'].setEnabled(False)
         self._actions["acquire"].setEnabled(False)
         self._actions["stop"].setEnabled(True)
         self.acquiring = True
@@ -286,6 +287,7 @@ class SpectroApp(CustomApp):
         self.data_file.write('\n')
 
     def stop_acquiring(self):
+        self.docks['settings'].setEnabled(True)
         self._actions["acquire"].setEnabled(True)
         self._actions["stop"].setEnabled(False)
         self.acquiring = False
