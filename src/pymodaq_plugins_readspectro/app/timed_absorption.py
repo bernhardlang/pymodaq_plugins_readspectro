@@ -1,4 +1,7 @@
-from pymoda_plugins_readspectro.app import SpectroApp
+from qtpy.QtWidgets import QProgressBar, QMainWindow
+from pymodaq_plugins_readspectro.app.absorption import SpectroApp
+from pymodaq_gui.utils.dock import DockArea, Dock
+from pymodaq.utils.data import DataToExport
 
 
 CONTINUOUS = 0
@@ -31,8 +34,10 @@ class TimedSpectroApp(SpectroApp):
           'tip': 'Logarithmic points per time decade measurement'},
          ]
 
+    app_name = "timed-absorption"
+    
     def __init__(self, parent: DockArea, plugin):
-        super().__init__(parent)
+        super().__init__(parent, plugin)
         self.scan_mode = CONTINUOUS
         self.adjust_parameters()
 
@@ -179,13 +184,12 @@ def main():
     app = mkQApp(plugin)
     pyqtRemoveInputHook() # needed for using pdb inside the qt eventloop
 
-    mainwindow = MainWindow()
+    mainwindow = QMainWindow()
     dockarea = DockArea()
     mainwindow.setCentralWidget(dockarea)
 
     prog = TimedSpectroApp(dockarea, plugin=plugin)
-    mainwindow.application = prog # not very clean, could be done by event filter
-    mainwindow.set_shutdown_callback(prog.quit_function)
+    #mainwindow.set_shutdown_callback(prog.quit_function)
     mainwindow.show()
 
     app.exec()

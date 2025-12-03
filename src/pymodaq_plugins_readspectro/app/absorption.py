@@ -13,7 +13,6 @@ from pymodaq.utils.data import DataToExport, DataFromPlugins
 from pymodaq_gui.utils.custom_app import CustomApp
 from pymodaq_gui.plotting.data_viewers.viewer1D import Viewer1D
 from pymodaq_gui.utils.dock import DockArea, Dock
-from pymodaq_gui.utils.main_window import MainWindow
 
 
 RAW             = 0
@@ -36,6 +35,8 @@ class SpectroApp(CustomApp):
                'tip': 'Measurement Mode'},
               ]
 
+    app_name = "absorption"
+
     def __init__(self, parent: DockArea, plugin):
         super().__init__(parent)
 
@@ -45,7 +46,7 @@ class SpectroApp(CustomApp):
         # keep screen geometry between runs, should be integrated into
         # PyMoDAQ settings. Is anyway kind of messy because Qt and
         # pyqtgraph don't handle the matter very consistently.
-        settings = QSettings("chiphy", "spectro-read")
+        settings = QSettings("chiphy", self.app_name)
         geometry = settings.value("geometry", QByteArray())
         self.mainwindow.restoreGeometry(geometry)
         state = settings.value("dockarea", None)
@@ -122,8 +123,7 @@ class SpectroApp(CustomApp):
         self.detector.settings.child('detector_settings', 'integration_time')\
             .setValue(self.settings.child('integration_time').value())
 
-        self.mainwindow.set_shutdown_callback(self.detector.quit_fun)
-        self.detector.grab_status.connect(self.mainwindow.disable_close)
+        #self.detector.grab_status.connect(self.mainwindow.disable_close)
         
     def setup_actions(self):
         self.add_action('acquire', 'Acquire', 'run2',
@@ -368,7 +368,7 @@ class SpectroApp(CustomApp):
     def clean_up(self):
         self.detector.quit_fun()
         QApplication.processEvents()
-        settings = QSettings("chiphy", "spectro-read")
+        settings = QSettings("chiphy", self.app_name)
         settings.setValue("geometry", self.mainwindow.saveGeometry())
         settings.setValue("dockarea", self.dockarea.saveState())
         settings.setValue("settings-header-0",
@@ -395,13 +395,12 @@ def main():
     app = mkQApp(plugin)
     pyqtRemoveInputHook() # needed for using pdb inside the qt eventloop
 
-    mainwindow = MainWindow()
+    mainwindow = QMainWindow()
     dockarea = DockArea()
     mainwindow.setCentralWidget(dockarea)
 
     prog = SpectroApp(dockarea, plugin=plugin)
-    mainwindow.application = prog # not very clean, could be done by event filter
-    mainwindow.set_shutdown_callback(prog.quit_function)
+    #mainwindow.set_shutdown_callback(prog.quit_function)
     mainwindow.show()
 
     app.exec()
