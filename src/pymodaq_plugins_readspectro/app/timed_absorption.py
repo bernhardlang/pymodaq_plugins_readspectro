@@ -1,7 +1,7 @@
 from qtpy.QtWidgets import QProgressBar, QMainWindow
-from pymodaq_plugins_readspectro.app.absorption import SpectroApp
 from pymodaq_gui.utils.dock import DockArea, Dock
 from pymodaq.utils.data import DataToExport
+from pymodaq_plugins_readspectro.app.absorption import SpectroApp, main
 
 
 CONTINUOUS = 0
@@ -13,13 +13,18 @@ class TimedSpectroApp(SpectroApp):
 
     scan_modes = { 'Continuous': CONTINUOUS, 'Linear Sequential': LINEAR,
                    'Lin-log Sequential': LIN_LOG }
-    scan_params = ['linear_step', 'scan_end', 'log_start', 'points_per_decade' ]
-    visible_params = { CONTINUOUS: [], LINEAR: ['linear_step', 'scan_end'],
+    scan_params = ['reference_refresh', 'linear_step', 'scan_end', 'log_start',
+                   'points_per_decade' ]
+    visible_params = { CONTINUOUS: [],
+                       LINEAR: ['reference_refresh', 'linear_step', 'scan_end'],
                        LIN_LOG: scan_params }
 
     params = SpectroApp.params + \
         [{'name': 'scan_mode', 'title': 'Scan Mode', 'type': 'list',
           'limits': list(scan_modes.keys()), 'tip': 'Scan Mode'},
+         {'name': 'reference_refresh', 'title': 'Refresh Reference [sec]',
+          'type': 'float', 'min': 1, 'max': 1000, 'value': 10,
+          'tip': 'Minimum interval after which the reference is refreshed'},
          {'name': 'linear_step', 'title': 'Linear Scan Step [sec]',
           'type': 'float', 'min': 0.001, 'max': 1000, 'value': 1,
           'tip': 'Scan step in seconds'},
@@ -36,8 +41,8 @@ class TimedSpectroApp(SpectroApp):
 
     app_name = "timed-absorption"
     
-    def __init__(self, parent: DockArea, plugin):
-        super().__init__(parent, plugin)
+    def __init__(self, parent: DockArea, plugin, main_window=None):
+        super().__init__(parent, plugin, main_window=main_window)
         self.scan_mode = CONTINUOUS
         self.adjust_parameters()
 
@@ -163,37 +168,6 @@ class TimedSpectroApp(SpectroApp):
         self.system_start_time = None
         self.detector.snap()
 
-def main():
-    #<<-- unify this wirth SpectroApp
-    import sys
-    from pymodaq_gui.utils.utils import mkQApp
-    from qtpy.QtCore import pyqtRemoveInputHook
-
-    if len(sys.argv) > 1:
-        if sys.argv[1] == '--simulate':
-            plugin = "MockSpectro"
-        elif len(sys.argv) > 2 and sys.argv[1] == '--plugin':
-            plugin=sys.argv[2]
-            del sys.argv[2]
-            del sys.argv[1]
-        else:
-            raise RuntimeError("command line argument error")
-    else:
-        plugin='Avantes'
-
-    app = mkQApp(plugin)
-    pyqtRemoveInputHook() # needed for using pdb inside the qt eventloop
-
-    mainwindow = QMainWindow()
-    dockarea = DockArea()
-    mainwindow.setCentralWidget(dockarea)
-
-    prog = TimedSpectroApp(dockarea, plugin=plugin)
-    #mainwindow.set_shutdown_callback(prog.quit_function)
-    mainwindow.show()
-
-    app.exec()
-
 
 if __name__ == '__main__':
-    main()
+    main(TimedSpectroApp)

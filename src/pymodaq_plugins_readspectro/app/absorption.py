@@ -13,6 +13,7 @@ from pymodaq.utils.data import DataToExport, DataFromPlugins
 from pymodaq_gui.utils.custom_app import CustomApp
 from pymodaq_gui.plotting.data_viewers.viewer1D import Viewer1D
 from pymodaq_gui.utils.dock import DockArea, Dock
+from pymodaq_plugins_readspectro.gui_utils import MainWindow
 
 
 RAW             = 0
@@ -37,7 +38,7 @@ class SpectroApp(CustomApp):
 
     app_name = "absorption"
 
-    def __init__(self, parent: DockArea, plugin):
+    def __init__(self, parent: DockArea, plugin, main_window=None):
         super().__init__(parent)
 
         self.plugin = plugin
@@ -68,6 +69,9 @@ class SpectroApp(CustomApp):
         self.have_reference = False
         self.acquiring = False
         self.adjust_actions()
+
+        if main_window is not None:
+            main_window.set_shutdown_callback(self.quit_function)
 
     def setup_docks(self):
         # left column: essential parameters at top, small plots for dark and
@@ -377,7 +381,7 @@ class SpectroApp(CustomApp):
                           self._settings_tree.widget.header().sectionSize(0))
 
 
-def main():
+def main(prog):
     import sys
     from pymodaq_gui.utils.utils import mkQApp
     from qtpy.QtCore import pyqtRemoveInputHook
@@ -397,16 +401,15 @@ def main():
     app = mkQApp(plugin)
     pyqtRemoveInputHook() # needed for using pdb inside the qt eventloop
 
-    mainwindow = QMainWindow()
+    mainwindow = MainWindow()
     dockarea = DockArea()
     mainwindow.setCentralWidget(dockarea)
 
-    prog = SpectroApp(dockarea, plugin=plugin)
-    #mainwindow.set_shutdown_callback(prog.quit_function)
+    prog = prog(dockarea, plugin=plugin, main_window=mainwindow)
     mainwindow.show()
 
     app.exec()
 
 
 if __name__ == '__main__':
-    main()
+    main(SpectroApp)

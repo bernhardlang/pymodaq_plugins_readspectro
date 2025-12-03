@@ -133,7 +133,7 @@ class DAQ_1DViewer_MockSpectro(DAQ_Viewer_base):
 
     def simulate_spectrum(self):
         n_pixels = self.settings.child("n_pixels").value()
-        integration = self.settings.child("integration_time").value()
+        integration = self.settings.child("integration_time").value() / 1000
         time.sleep(integration)
         data = \
             np.random.normal(loc=self.settings.child("dark_level").value()
