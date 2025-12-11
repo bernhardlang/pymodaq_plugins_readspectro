@@ -1,5 +1,6 @@
 import numpy as np
 import csv, time
+from copy import deepcopy
 from qtpy.QtCore import QByteArray, QSettings, QTimer
 from qtpy.QtGui import QKeySequence
 from qtpy.QtWidgets import QMainWindow, QWidget, QApplication, QProgressBar, \
@@ -69,6 +70,8 @@ class SpectroApp(CustomApp):
         self.have_reference = False
         self.acquiring = False
         self.adjust_actions()
+#        self.delimiter = '\t'
+        self.delimiter = ','
 
         if main_window is not None:
             main_window.set_shutdown_callback(self.quit_function)
@@ -233,6 +236,7 @@ class SpectroApp(CustomApp):
         """
         data1D = data.get_data_from_dim('Data1D')
         signal = data1D[0]
+        self.raw_data = deepcopy(signal[0])
         try:
             ava_time_stamp = data.get_data_from_name('timestamp')[0][0] / 100
         except:
@@ -271,24 +275,6 @@ class SpectroApp(CustomApp):
         self._actions["stop"].setEnabled(True)
         self.acquiring = True
         self.detector.grab()
-
-    def write_spectrum(self, t1, t2, spectrum):
-        """Writes a single spectrum to file.
-        The first two columns contain the system time at data retrieval
-        and the time stamp returned by the avaspec library, respectively.
-        """
-        self.data_file.write('%d\t%d'
-                             % (int(np.floor(t1 + 0.5)),
-                                int(np.floor(t2 + 0.5))))
-        if self.measurement_mode == ABSORPTION and t1 != -1:
-            # To save space in the data file, absorption data are stored as
-            # integer numbers. 1 LSB is 1µOD.
-            for value in spectrum:
-                self.data_file.write('\t%d' % (value * 1000 + 0.5))
-        else:
-            for value in spectrum:
-                self.data_file.write(self.format_string.format(val = value))
-        self.data_file.write('\n')
 
     def stop_acquiring(self):
         self.docks['settings'].setEnabled(True)
@@ -362,10 +348,32 @@ class SpectroApp(CustomApp):
             return
         wavelengths = self.detector.controller.wavelengths
         with open(result[0], "wt") as csv_file:
-            writer = csv.writer(csv_file, delimiter='\t',
+            writer = csv.writer(csv_file, delimiter=self.delimiter,
                                 quotechar='|', quoting=csv.QUOTE_MINIMAL)
+            if self.measurement_mode == RAW or not self.have_background:
+                writer.writerow(['wavelength', 'raw data'])
+                for i,wl in enumerate(wavelengths):
+                    writer.writerow(['%.1f' % wl, '%.1f' % self.current_data[i]])
+                return
+
+            if self.measurement_mode == WITH_BACKGROUND \
+               or not self.have_reference:
+                writer.writerow(['wavelength', 'raw data', 'background',
+                                 'background subtracted'])
+                for i,wl in enumerate(wavelengths):
+                    writer.writerow(['%.1f' % wl, '%.1f' % self.raw_data[i],
+                                     '%.1f' % self.background[i],
+                                     '%.1f' % self.current_data[i]])
+                return
+
+            # self.measurement_mode == ABSORPTION
+            writer.writerow(['wavelength', 'raw data', 'background',
+                             'reference', 'absorption'])
             for i,wl in enumerate(wavelengths):
-                writer.writerow([wl, self.current_data[i]])
+                writer.writerow(['%.1f' % wl, '%.1f' % self.raw_data[i],
+                                 '%.1f' % self.background[i],
+                                 '%.1f' % self.reference[i],
+                                 '%.6f' % self.current_data[i]])
 
     def quit_function(self):
         self.clean_up()

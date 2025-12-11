@@ -168,6 +168,24 @@ class TimedSpectroApp(SpectroApp):
         self.system_start_time = None
         self.detector.snap()
 
+    def write_spectrum(self, t1, t2, spectrum):
+        """Writes a single spectrum to file.
+        The first two columns contain the system time at data retrieval
+        and the time stamp returned by the avaspec library, respectively.
+        """
+        self.data_file.write('%d\t%d'
+                             % (int(np.floor(t1 + 0.5)),
+                                int(np.floor(t2 + 0.5))))
+        if self.measurement_mode == ABSORPTION and t1 != -1:
+            # To save space in the data file, absorption data are stored as
+            # integer numbers. 1 LSB is 1µOD.
+            for value in spectrum:
+                self.data_file.write('\t%d' % (value * 1000 + 0.5))
+        else:
+            for value in spectrum:
+                self.data_file.write(self.format_string.format(val = value))
+        self.data_file.write('\n')
+
 
 if __name__ == '__main__':
     main(TimedSpectroApp)
