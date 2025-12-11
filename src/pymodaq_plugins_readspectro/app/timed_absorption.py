@@ -72,6 +72,12 @@ class TimedSpectroApp(SpectroApp):
                 self.settings.child(child).hide()
 
     def show_data(self, data: DataToExport):
+        try:
+            ava_time_stamp = data.get_data_from_name('timestamp')[0][0] / 100
+        except:
+            ava_time_stamp = 0
+        system_time_stamp = time.time_ns() * 1e-6
+
         super().show_data(data)
         if self.scan_mode == CONTINUOUS or not self.acquiring:
             return

@@ -9,7 +9,6 @@ from pyqtgraph import GraphicsLayoutWidget, PlotDataItem, FillBetweenItem
 from pyqtgraph import PlotItem, PlotDataItem, ViewBox
 from pyqtgraph.dockarea import DockLabel
 from pyqtgraph import GraphicsWidget, PlotWidget
-from pymodaq.control_modules.daq_viewer import DAQ_Viewer
 from pymodaq.utils.data import DataToExport, DataFromPlugins
 from pymodaq_gui.utils.custom_app import CustomApp
 from pymodaq_gui.plotting.data_viewers.viewer1D import Viewer1D
@@ -27,11 +26,20 @@ class SpectroApp(CustomApp):
                           'Absorption': ABSORPTION }
 
     params = [{'name': 'integration_time', 'title': 'Integration Time [ms]',
-               'type': 'float', 'min': 1, 'max': 10000, 'value': 500,
+               'type': 'float', 'min': 1, 'max': 10000, 'value': 50,
                'tip': 'Integration time in seconds'},
               {'name': 'averaging', 'title': 'Averaging',
-               'type': 'int', 'min': 1, 'max': 1000, 'value': 1,
+               'type': 'int', 'min': 1, 'max': 1000, 'value': 10,
                'tip': 'Software Averaging'},
+              {'name': 'pymo_averaging', 'title': 'PyMoDAQ Averaging',
+               'type': 'int', 'min': 1, 'max': 1000, 'value': 10,
+               'tip': 'Background Software Averaging'},
+              {'name': 'back_averaging', 'title': 'Background Averaging',
+               'type': 'int', 'min': 1, 'max': 1000, 'value': 100,
+               'tip': 'Background Software Averaging'},
+              {'name': 'ref_averaging', 'title': 'Reference Averaging',
+               'type': 'int', 'min': 1, 'max': 1000, 'value': 100,
+               'tip': 'Reference Software Averaging'},
               {'name': 'measurement_mode', 'title': 'Measurement Mode',
                'type': 'list', 'limits': list(measurement_modes.keys()),
                'tip': 'Measurement Mode'},
@@ -69,6 +77,9 @@ class SpectroApp(CustomApp):
         self.have_background = False
         self.have_reference = False
         self.acquiring = False
+#        self.n_average = 1
+#        self.n_back = 1
+#        self.n_ref = 1
         self.adjust_actions()
 #        self.delimiter = '\t'
         self.delimiter = ','
@@ -121,7 +132,8 @@ class SpectroApp(CustomApp):
         # separate window with raw detector data
         self.daq_viewer_area = DockArea()
         self.detector = \
-            Custom_DAQ_Viewer(self.daq_viewer_area, title=self.plugin, init_h5=False)
+            Custom_DAQ_Viewer(self.daq_viewer_area, title=self.plugin,
+                              no_continuous_saving=True)
         self.detector.daq_type = 'DAQ1D'
         self.detector.detector = self.plugin
         self.detector.init_hardware()
@@ -155,7 +167,7 @@ class SpectroApp(CustomApp):
         self.connect_action('stop', self.stop_acquiring)
         self.connect_action('background', self.take_background)
         self.connect_action('reference', self.take_reference)
-        self.detector.grab_done_signal.connect(self.show_data)
+        self.detector.grab_done_signal.connect(self.take_data)
 
     def setup_menu(self):
         file_menu = self.mainwindow.menuBar().addMenu('File')
@@ -178,12 +190,9 @@ class SpectroApp(CustomApp):
             self.adjust_actions()
 
         if param.name() == "averaging":
-            self.detector.settings.child('main_settings', 'Naverage') \
-                                         .setValue(param.value())
-            self.have_background = False
-            self.have_reference = False
-            self.adjust_actions()
-
+            self.average = param.value()
+        elif param.name() == "back_averaging":
+            self.background_average = param.value()
         elif param.name() == "measurement_mode":
             self.measurement_mode = self.measurement_modes[param.value()]
 
@@ -226,46 +235,71 @@ class SpectroApp(CustomApp):
     def show_detector(self, status):
         self.daq_viewer_area.setVisible(status)
 
-    def show_data(self, data: DataToExport):
-        """Display incoming data.
+    def average_data(self, sum_data, squares_data, samples):
+        mean = sum_data / samples
+        error = np.sqrt((samples * squares_data - sum_data**2)
+                        / (samples**2 * (samples - 1)))
+        return mean, error
 
-        In linear or logarithmic scan mode: schedule next acquisition
-        afterwards.
-        ----------
-        data: DataToExport
-        """
-        data1D = data.get_data_from_dim('Data1D')
-        signal = data1D[0]
-        self.raw_data = deepcopy(signal[0])
-        try:
-            ava_time_stamp = data.get_data_from_name('timestamp')[0][0] / 100
-        except:
-            ava_time_stamp = 0
-        system_time_stamp = time.time_ns() * 1e-6
-
-        if self.measurement_mode != RAW:
-            if not hasattr(self, 'background'):
-                return
-            signal[0] -= self.background
-            signal.labels = ['signal-background']
-
-        if self.measurement_mode == ABSORPTION:
-            if not hasattr(self, 'reference'):
-                return
-            valid_mask = np.logical_and(signal[0] > 0, self.reference_valid_mask)
-            absorption = np.where(valid_mask,
-                                  -np.log10(signal[0] / self.reference), 0)
-            dfp = DataFromPlugins(name='absorption', data=[absorption],
-                                  dim='Data1D', labels=['absorption'])
-            self.spectrum_viewer.show_data(dfp)
-            dfp = DataFromPlugins(name='raw',
-                                  data=[signal[0], self.reference],
-                                  dim='Data1D', labels=['signal', 'reference'])
-            self.raw_data_viewer.show_data(dfp)
-            self.current_data = absorption
+    def accumulate_data(self, data, n_samples):
+        if n_samples:
+            self.sum_data += data
+            self.squares_data += data**2
         else:
-            self.current_data = signal[0]
-            self.spectrum_viewer.show_data(signal)
+            self.sum_data = data
+            self.squares_data = data**2
+        return n_samples + 1
+
+    def take_data(self, data: DataToExport):
+        data1D = data.get_data_from_dim('Data1D')
+        self.n_samples = self.accumulate_data(data[0][0], self.n_samples)
+        if self.n_samples <= self.n_average:
+            return
+
+        mean_raw, error_raw = \
+            self.average_data(self.sum_data, self.squares_data, self.n_samples)
+        self.n_samples = 0
+
+        if self.measurement_mode == RAW:
+            self.show_data(mean_raw, error_raw, 'raw')
+            return
+
+        self.mean_signal = mean_raw - self.background
+        if self.measurement_mode == WITH_BACKGROUND:
+            self.show_data(self.mean_signal,
+                           np.sqrt(error_raw**2
+                                   + self.error_background**2),
+                           'signal', mean_raw)
+        else: # self.measurement_mode == ABSORPTION:
+            valid_mask = \
+                np.logical_and(self.mean_signal > 0, self.reference_valid_mask)
+            self.absorption = \
+                np.where(valid_mask,
+                         -np.log10(self.mean_signal / self.reference), 0)
+            self.error_absorption = \
+                1 / np.log(10) \
+                * np.sqrt((error_raw / self.mean_signal)**2
+                          + ((self.error_reference + self.error_background)
+                             / self.reference)**2
+                          + (1 / self.mean_signal - 1 / self.reference)**2
+                            * self.error_background)
+
+            self.show_data(self.absorption, self.error_absorption, 'absorption',
+                           mean_raw, self.reference)
+
+    def show_data(self, mean, error, name, raw=None, reference=None):
+        dfp = DataFromPlugins(name=name, data=[mean, error], dim='Data1D',
+                              labels=[name, 'error'])
+        self.spectrum_viewer.show_data(dfp)
+        if raw is not None:
+            data = [raw]
+            labels = ['raw signal']
+            if reference is not None:
+                data.append(reference)
+                labels.append('reference')
+            dfp = DataFromPlugins(name='raw', data=data, dim='Data1D',
+                                  labels=labels)
+            self.raw_data_viewer.show_data(dfp)
 
     def start_acquiring(self):
         """Start acquisition"""
@@ -274,6 +308,8 @@ class SpectroApp(CustomApp):
         self._actions["acquire"].setEnabled(False)
         self._actions["stop"].setEnabled(True)
         self.acquiring = True
+        self.n_average = self.settings.child('averaging').value()
+        self.n_samples = 0
         self.detector.grab()
 
     def stop_acquiring(self):
@@ -289,17 +325,17 @@ class SpectroApp(CustomApp):
         if hasattr(self.detector.controller, "open_dark_shutter"):
             self.detector.controller.open_dark_shutter(False)
 
-        n_average = \
-            self.detector.settings.child('main_settings', 'Naverage').value()
-        self.background,timestamp = self.detector.controller.grab_spectrum()
-        for _ in range(1, n_average):
-            data,timestamp = self.detector.controller.grab_spectrum()
-            self.background += data
-        self.background /= n_average
+        self.n_back = self.settings.child('back_averaging').value()
+        for i in range(0, self.n_back):
+            background,timestamp = self.detector.controller.grab_spectrum()
+            self.accumulate_data(background, i)
+        self.background, self.error_background = \
+            self.average_data(self.sum_data, self.squares_data, self.n_back)
         self.have_background = True
         self.adjust_actions()
-        dfp = DataFromPlugins(name='Avantes', data=self.background, dim='Data1D',
-                              labels=['background'])
+        dfp = DataFromPlugins(name='Avantes',
+                              data=[self.background, self.error_background],
+                              dim='Data1D', labels=['background', 'error'])
         self.spectrum_viewer.show_data(dfp)
         self.background_viewer.show_data(dfp)
         if hasattr(self.detector.controller, "open_dark_shutter"):
@@ -311,32 +347,29 @@ class SpectroApp(CustomApp):
         if hasattr(self.detector.controller, "set_reference_switch"):
             self.detector.controller.set_reference_switch(True)
 
-        n_average = \
-            self.detector.settings.child('main_settings', 'Naverage').value()
+        self.n_ref = self.settings.child('ref_averaging').value()
 
-        self.reference = np.zeros(len(self.background))
-        self.reference_valid_mask = \
-            np.full(len(self.background), True, dtype=bool)
-        for _ in range(n_average):
-            data,timestamp = self.detector.controller.grab_spectrum()
-            data -= self.background
-            self.reference_valid_mask = \
-                np.logical_and(data > 0, self.reference_valid_mask)
-            self.reference += data
+        for i in range(0, self.n_back):
+            reference,timestamp = self.detector.controller.grab_spectrum()
+            self.accumulate_data(reference, i)
+        self.reference, self.error_reference = \
+            self.average_data(self.sum_data, self.squares_data, self.n_ref)
+        self.reference -= self.background
 
-        self.reference /= n_average
+        self.reference_valid_mask = self.reference > 0
         self.have_reference = True
         self.adjust_actions()
-        dfp = DataFromPlugins(name='Avantes', data=self.reference, dim='Data1D',
-                              labels=['data'])
+        dfp = DataFromPlugins(name='Avantes',
+                              data=[self.reference, self.error_reference],
+                              dim='Data1D', labels=['reference', 'error'])
         self.spectrum_viewer.show_data(dfp)
-        dfp = DataFromPlugins(name='Avantes', data=self.reference, dim='Data1D',
-                              labels=['reference'])
+        dfp = DataFromPlugins(name='Avantes',
+                              data=[self.reference, self.error_reference],
+                              dim='Data1D', labels=['reference', 'error'])
         self.raw_data_viewer.show_data(dfp)
 
         if hasattr(self.detector.controller, "set_reference_switch"):
             self.detector.controller.set_reference_switch(False)
-
 
     def save_current_data(self):
         """Save dat currently displayed on the main plot."""
@@ -397,22 +430,28 @@ def main(prog):
 
 
     app = QApplication(sys.argv)
-    splash_pixmap = QPixmap("splash.png")
-    splash = QSplashScreen(splash_pixmap)
-    splash.show()
 #    app.processEvents()
 
-    if len(sys.argv) > 1:
-        if sys.argv[1] == '--simulate':
+    show_splash = True
+    plugin = 'Avantes'
+
+    arg_pos = 1
+    while arg_pos < len(sys.argv):
+        if sys.argv[arg_pos] == '--simulate':
             plugin = "MockSpectro"
-        elif len(sys.argv) > 2 and sys.argv[1] == '--plugin':
-            plugin=sys.argv[2]
-            del sys.argv[2]
-            del sys.argv[1]
+        elif sys.argv[arg_pos] == '--plugin' and arg_pos < len(sys.argv) - 1:
+            arg_pos += 1
+            plugin=sys.argv[arg_pos]
+        elif sys.argv[arg_pos] == '--no-splash':
+            show_splash = False
         else:
             raise RuntimeError("command line argument error")
-    else:
-        plugin='Avantes'
+        arg_pos += 1
+
+    if show_splash:
+        splash_pixmap = QPixmap("splash.png")
+        splash = QSplashScreen(splash_pixmap)
+        splash.show()
 
     app = mkQApp(plugin)
     pyqtRemoveInputHook() # needed for using pdb inside the qt eventloop
@@ -422,8 +461,12 @@ def main(prog):
     mainwindow.setCentralWidget(dockarea)
 
     prog = prog(dockarea, plugin=plugin, main_window=mainwindow)
-    QTimer.singleShot(2000, splash.close)
-    QTimer.singleShot(2000, mainwindow.show)
+
+    if show_splash:
+        QTimer.singleShot(2000, splash.close)
+        QTimer.singleShot(2000, mainwindow.show)
+    else:
+        mainwindow.show()
 
     sys.exit(app.exec())
 

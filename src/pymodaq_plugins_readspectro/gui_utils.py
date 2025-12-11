@@ -60,18 +60,14 @@ class Custom_DAQ_Viewer(DAQ_Viewer):
     def __init__(self, parent: Optional[DockArea] = None, title: str = "Testing",
                  daq_type=config("viewer", "daq_type"), dock_settings=None,
                  dock_viewer=None, **kwargs, ):
-        self.have_h5 = False
         try:
-            if kwargs['h5-saving'] == True:
-                self.have_h5 = True
+            self.have_h5 = not bool(kwargs['no_continuous_saving'])
         except:
-            pass
+            self.have_h5 = True
 
         super().__init__(parent, title, daq_type, dock_settings, dock_viewer,
                          **kwargs)
 
     @property
     def h5saver(self):
-        if not self.have_h5:
-            return None
-        return super().h5saver()
+        return super().h5saver() if self.have_h5 else None
