@@ -2,9 +2,9 @@ import numpy as np
 import csv, time
 from copy import deepcopy
 from qtpy.QtCore import QByteArray, QSettings, QTimer
-from qtpy.QtGui import QKeySequence
+from qtpy.QtGui import QKeySequence, QPixmap
 from qtpy.QtWidgets import QMainWindow, QWidget, QApplication, QProgressBar, \
-    QFileDialog
+    QFileDialog, QSplashScreen
 from pyqtgraph import GraphicsLayoutWidget, PlotDataItem, FillBetweenItem
 from pyqtgraph import PlotItem, PlotDataItem, ViewBox
 from pyqtgraph.dockarea import DockLabel
@@ -14,7 +14,7 @@ from pymodaq.utils.data import DataToExport, DataFromPlugins
 from pymodaq_gui.utils.custom_app import CustomApp
 from pymodaq_gui.plotting.data_viewers.viewer1D import Viewer1D
 from pymodaq_gui.utils.dock import DockArea, Dock
-from pymodaq_plugins_readspectro.gui_utils import MainWindow
+from pymodaq_plugins_readspectro.gui_utils import MainWindow, Custom_DAQ_Viewer
 
 
 RAW             = 0
@@ -121,7 +121,7 @@ class SpectroApp(CustomApp):
         # separate window with raw detector data
         self.daq_viewer_area = DockArea()
         self.detector = \
-            DAQ_Viewer(self.daq_viewer_area, title=self.plugin, init_h5=False)
+            Custom_DAQ_Viewer(self.daq_viewer_area, title=self.plugin, init_h5=False)
         self.detector.daq_type = 'DAQ1D'
         self.detector.detector = self.plugin
         self.detector.init_hardware()
@@ -390,9 +390,17 @@ class SpectroApp(CustomApp):
 
 
 def main(prog):
-    import sys
+    import sys, time
     from pymodaq_gui.utils.utils import mkQApp
-    from qtpy.QtCore import pyqtRemoveInputHook
+    from qtpy.QtCore import pyqtRemoveInputHook, QTimer
+    from qtpy.QtWidgets import QSplashScreen
+
+
+    app = QApplication(sys.argv)
+    splash_pixmap = QPixmap("splash.png")
+    splash = QSplashScreen(splash_pixmap)
+    splash.show()
+#    app.processEvents()
 
     if len(sys.argv) > 1:
         if sys.argv[1] == '--simulate':
@@ -414,10 +422,10 @@ def main(prog):
     mainwindow.setCentralWidget(dockarea)
 
     prog = prog(dockarea, plugin=plugin, main_window=mainwindow)
-    mainwindow.show()
+    QTimer.singleShot(2000, splash.close)
+    QTimer.singleShot(2000, mainwindow.show)
 
-    app.exec()
-
+    sys.exit(app.exec())
 
 if __name__ == '__main__':
     main(SpectroApp)

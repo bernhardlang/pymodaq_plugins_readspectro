@@ -45,3 +45,33 @@ class MainWindow(QMainWindow):
                 return
 
         event.ignore() # to be checked if that is needed or even wanted
+
+
+# patch to prevent not needed saving to fill up the hard disk
+
+from pymodaq_gui.utils.dock import DockArea
+from pymodaq.control_modules.daq_viewer import DAQ_Viewer
+from pymodaq.utils.config import Config as ControlModulesConfig
+from typing import Optional
+config = ControlModulesConfig()
+
+class Custom_DAQ_Viewer(DAQ_Viewer):
+
+    def __init__(self, parent: Optional[DockArea] = None, title: str = "Testing",
+                 daq_type=config("viewer", "daq_type"), dock_settings=None,
+                 dock_viewer=None, **kwargs, ):
+        self.have_h5 = False
+        try:
+            if kwargs['h5-saving'] == True:
+                self.have_h5 = True
+        except:
+            pass
+
+        super().__init__(parent, title, daq_type, dock_settings, dock_viewer,
+                         **kwargs)
+
+    @property
+    def h5saver(self):
+        if not self.have_h5:
+            return None
+        return super().h5saver()
