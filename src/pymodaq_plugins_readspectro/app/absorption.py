@@ -32,7 +32,7 @@ class SpectroApp(CustomApp):
                'type': 'int', 'min': 1, 'max': 1000, 'value': 10,
                'tip': 'Software Averaging'},
               {'name': 'pymo_averaging', 'title': 'PyMoDAQ Averaging',
-               'type': 'int', 'min': 1, 'max': 1000, 'value': 10,
+               'type': 'int', 'min': 1, 'max': 1000, 'value': 1,
                'tip': 'Background Software Averaging'},
               {'name': 'back_averaging', 'title': 'Background Averaging',
                'type': 'int', 'min': 1, 'max': 1000, 'value': 100,
@@ -177,7 +177,6 @@ class SpectroApp(CustomApp):
         self.quit_action = file_menu.addAction("Quit", QKeySequence('Ctrl+Q'))
 
     def value_changed(self, param):
-        # <<-- param widget should be readonly during measurement
         if param.name() == "integration_time":
             self.detector.settings.child('detector_settings',
                                          'integration_time') \
@@ -191,6 +190,13 @@ class SpectroApp(CustomApp):
 
         if param.name() == "averaging":
             self.average = param.value()
+        if param.name() == "pymo_averaging":
+            try:
+                self.detector.settings.child('main_settings', 'Naverage') \
+                                      .setValue(param.value())
+            except:
+                import pdb
+                pdb.set_trace()
         elif param.name() == "back_averaging":
             self.background_average = param.value()
         elif param.name() == "measurement_mode":
