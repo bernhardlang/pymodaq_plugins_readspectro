@@ -262,20 +262,19 @@ class SpectroApp(CustomApp):
         if self.n_samples <= self.n_average:
             return
 
-        mean_raw, error_raw = \
+        self.mean_raw, self.error_raw = \
             self.average_data(self.sum_data, self.squares_data, self.n_samples)
         self.n_samples = 0
 
         if self.measurement_mode == RAW:
-            self.show_data(mean_raw, error_raw, 'raw')
+            self.show_data(self.mean_raw, self.error_raw, 'raw')
             return
 
-        self.mean_signal = mean_raw - self.background
+        self.mean_signal = self.mean_raw - self.background
+        self.error_signal = np.sqrt(self.error_raw**2 + self.error_background**2)
         if self.measurement_mode == WITH_BACKGROUND:
-            self.show_data(self.mean_signal,
-                           np.sqrt(error_raw**2
-                                   + self.error_background**2),
-                           'signal', mean_raw)
+            self.show_data(self.mean_signal, self.error_signal,
+                           'signal', self.mean_raw)
         else: # self.measurement_mode == ABSORPTION:
             valid_mask = \
                 np.logical_and(self.mean_signal > 0, self.reference_valid_mask)
@@ -284,14 +283,14 @@ class SpectroApp(CustomApp):
                          -np.log10(self.mean_signal / self.reference), 0)
             self.error_absorption = \
                 1 / np.log(10) \
-                * np.sqrt((error_raw / self.mean_signal)**2
+                * np.sqrt((self.error_raw / self.mean_signal)**2
                           + ((self.error_reference + self.error_background)
                              / self.reference)**2
                           + (1 / self.mean_signal - 1 / self.reference)**2
                             * self.error_background)
 
             self.show_data(self.absorption, self.error_absorption, 'absorption',
-                           mean_raw, self.reference)
+                           self.mean_raw, self.reference)
 
     def show_data(self, mean, error, name, raw=None, reference=None):
         dfp = DataFromPlugins(name=name, data=[mean, error], dim='Data1D',
@@ -379,8 +378,6 @@ class SpectroApp(CustomApp):
 
     def save_current_data(self):
         """Save dat currently displayed on the main plot."""
-        if not hasattr(self, 'current_data'):
-            return
         result = QFileDialog.getSaveFileName(caption="Save Data", dir=".",
                                              filter="*.csv")
         if result is None or not len(result[0]):
@@ -390,29 +387,39 @@ class SpectroApp(CustomApp):
             writer = csv.writer(csv_file, delimiter=self.delimiter,
                                 quotechar='|', quoting=csv.QUOTE_MINIMAL)
             if self.measurement_mode == RAW or not self.have_background:
-                writer.writerow(['wavelength', 'raw data'])
+                writer.writerow(['wavelength', 'raw data', 'error'])
                 for i,wl in enumerate(wavelengths):
-                    writer.writerow(['%.1f' % wl, '%.1f' % self.current_data[i]])
+                    writer.writerow(['%.1f' % wl, '%.3f' % self.mean_raw[i],
+                                    '%.3f' % self.error_raw[i]])
                 return
 
             if self.measurement_mode == WITH_BACKGROUND \
                or not self.have_reference:
-                writer.writerow(['wavelength', 'raw data', 'background',
-                                 'background subtracted'])
+                writer.writerow(['wavelength', 'raw data', 'error raw',
+                                 'background', 'error background',
+                                 'background subtracted', 'error'])
                 for i,wl in enumerate(wavelengths):
-                    writer.writerow(['%.1f' % wl, '%.1f' % self.raw_data[i],
+                    writer.writerow(['%.1f' % wl, '%.3f' % self.mean_raw[i],
+                                     '%.1f' % self.error_raw[i],
                                      '%.1f' % self.background[i],
-                                     '%.1f' % self.current_data[i]])
+                                     '%.1f' % self.error_background[i],
+                                     '%.1f' % self.mean_signal[i],
+                                     '%.1f' % self.error_signal[i]])
                 return
 
             # self.measurement_mode == ABSORPTION
-            writer.writerow(['wavelength', 'raw data', 'background',
-                             'reference', 'absorption'])
+            writer.writerow(['wavelength', 'raw data', 'error raw', 'background',
+                             'error background', 'reference', 'error reference',
+                             'absorption', 'error'])
             for i,wl in enumerate(wavelengths):
-                writer.writerow(['%.1f' % wl, '%.1f' % self.raw_data[i],
-                                 '%.1f' % self.background[i],
-                                 '%.1f' % self.reference[i],
-                                 '%.6f' % self.current_data[i]])
+                writer.writerow(['%.1f' % wl, '%.3f' % self.mean_raw[i],
+                                 '%.3f' % self.error_raw[i],
+                                 '%.3f' % self.background[i],
+                                 '%.3f' % self.error_background[i],
+                                 '%.3f' % self.reference[i],
+                                 '%.3f' % self.error_reference[i],
+                                 '%.6f' % self.absorption[i],
+                                 '%.6f' % self.error_absorption[i]])
 
     def quit_function(self):
         self.clean_up()
