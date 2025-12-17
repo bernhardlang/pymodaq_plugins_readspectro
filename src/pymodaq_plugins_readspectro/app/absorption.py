@@ -26,7 +26,7 @@ class SpectroApp(CustomApp):
                           'Absorption': ABSORPTION }
 
     params = [{'name': 'integration_time', 'title': 'Integration Time [ms]',
-               'type': 'float', 'min': 1, 'max': 10000, 'value': 50,
+               'type': 'float', 'min': 0.001, 'max': 10000, 'value': 50,
                'tip': 'Integration time in seconds'},
               {'name': 'averaging', 'title': 'Averaging',
                'type': 'int', 'min': 1, 'max': 1000, 'value': 10,
