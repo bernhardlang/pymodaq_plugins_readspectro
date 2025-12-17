@@ -1,6 +1,7 @@
 import numpy as np
 import csv, time
 from copy import deepcopy
+from os import path
 from qtpy.QtCore import QByteArray, QSettings, QTimer
 from qtpy.QtGui import QKeySequence, QPixmap
 from qtpy.QtWidgets import QMainWindow, QWidget, QApplication, QProgressBar, \
@@ -56,20 +57,20 @@ class SpectroApp(CustomApp):
         # keep screen geometry between runs, should be integrated into
         # PyMoDAQ settings. Is anyway kind of messy because Qt and
         # pyqtgraph don't handle the matter very consistently.
-        settings = QSettings("chiphy", self.app_name)
-        geometry = settings.value("geometry", QByteArray())
+        self.qt_settings = QSettings("chiphy", self.app_name)
+        geometry = self.qt_settings.value("geometry", QByteArray())
         self.mainwindow.restoreGeometry(geometry)
-        state = settings.value("dockarea", None)
+        state = self.qt_settings.value("dockarea", None)
         if state is not None:
             try:
                 self.dockarea.restoreState(state)
             except: # pyqtgraph's state restoring is not very fail safe
                 # erease inconsistent settings in case pyqtgraph trips
-                settings.setValue("dockarea", None)
+                self.qt_settings.setValue("dockarea", None)
 
         # Retrieve spacing of first column in case the user has made it fully
         # visible in a previous run of the program.
-        header = settings.value("settings-header-0", None)
+        header = self.qt_settings.value("settings-header-0", None)
         if header is not None:
             self._settings_tree.widget.header().resizeSection(0, int(header))
 
@@ -378,10 +379,16 @@ class SpectroApp(CustomApp):
 
     def save_current_data(self):
         """Save dat currently displayed on the main plot."""
-        result = QFileDialog.getSaveFileName(caption="Save Data", dir=".",
+        directory = self.qt_settings.value('data-dir', None)
+        if directory is None:
+            directory = "."
+        result = QFileDialog.getSaveFileName(caption="Save Data", dir=directory,
                                              filter="*.csv")
         if result is None or not len(result[0]):
             return
+
+        self.qt_settings.setValue('data-dir', path.dirname(result[0]))
+
         wavelengths = self.detector.controller.wavelengths
         with open(result[0], "wt") as csv_file:
             writer = csv.writer(csv_file, delimiter=self.delimiter,
@@ -428,10 +435,9 @@ class SpectroApp(CustomApp):
     def clean_up(self):
         self.detector.quit_fun()
         QApplication.processEvents()
-        settings = QSettings("chiphy", self.app_name)
-        settings.setValue("geometry", self.mainwindow.saveGeometry())
-        settings.setValue("dockarea", self.dockarea.saveState())
-        settings.setValue("settings-header-0",
+        self.qt_settings.setValue("geometry", self.mainwindow.saveGeometry())
+        self.qt_settings.setValue("dockarea", self.dockarea.saveState())
+        self.qt_settings.setValue("settings-header-0",
                           self._settings_tree.widget.header().sectionSize(0))
 
 
