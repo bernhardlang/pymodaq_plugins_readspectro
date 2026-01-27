@@ -46,6 +46,8 @@ class SpectroApp(CustomApp):
                'tip': 'Measurement Mode'},
               ]
 
+    settings_entries = [param['name'] for param in params]
+
     app_name = "absorption"
 
     def __init__(self, parent: DockArea, plugin, main_window=None):
@@ -57,24 +59,12 @@ class SpectroApp(CustomApp):
         # keep screen geometry between runs, should be integrated into
         # PyMoDAQ settings. Is anyway kind of messy because Qt and
         # pyqtgraph don't handle the matter very consistently.
-        self.qt_settings = QSettings("chiphy", self.app_name)
-        geometry = self.qt_settings.value("geometry", QByteArray())
-        self.mainwindow.restoreGeometry(geometry)
-        state = self.qt_settings.value("dockarea", None)
-        if state is not None:
-            try:
-                self.dockarea.restoreState(state)
-            except: # pyqtgraph's state restoring is not very fail safe
-                # erease inconsistent settings in case pyqtgraph trips
-                self.qt_settings.setValue("dockarea", None)
-
-        # Retrieve spacing of first column in case the user has made it fully
-        # visible in a previous run of the program.
-        header = self.qt_settings.value("settings-header-0", None)
-        if header is not None:
-            self._settings_tree.widget.header().resizeSection(0, int(header))
-
         self.measurement_mode = RAW
+        self.qt_settings = QSettings("chiphy", self.app_name)
+        self.read_settings(self.qt_settings)
+
+        self.measurement_mode = \
+            self.measurement_modes[self.settings['measurement_mode']]
         self.have_background = False
         self.have_reference = False
         self.acquiring = False
@@ -177,6 +167,36 @@ class SpectroApp(CustomApp):
         file_menu.addSeparator()
         self.quit_action = file_menu.addAction("Quit", QKeySequence('Ctrl+Q'))
 
+    def read_settings(self, qt_settings):
+        geometry = self.qt_settings.value("geometry", QByteArray())
+        self.mainwindow.restoreGeometry(geometry)
+        state = self.qt_settings.value("dockarea", None)
+        if state is not None:
+            try:
+                self.dockarea.restoreState(state)
+            except: # pyqtgraph's state restoring is not very fail safe
+                # erease inconsistent settings in case pyqtgraph trips
+                self.qt_settings.setValue("dockarea", None)
+
+        # Retrieve spacing of first column in case the user has made it fully
+        # visible in a previous run of the program.
+        header = self.qt_settings.value("settings-header-0", None)
+        if header is not None:
+            self._settings_tree.widget.header().resizeSection(0, int(header))
+
+        for name in self.settings_entries:
+            value = qt_settings.value(name, None)
+            if value is not None:
+                self.settings[name] = value
+        
+    def write_settings(self, qt_settings):
+        qt_settings.setValue("geometry", self.mainwindow.saveGeometry())
+        qt_settings.setValue("dockarea", self.dockarea.saveState())
+        qt_settings.setValue("settings-header-0",
+                             self._settings_tree.widget.header().sectionSize(0))
+        for name in self.settings_entries:
+            qt_settings.setValue(name, self.settings[name])
+        
     def value_changed(self, param):
         if param.name() == "integration_time":
             self.detector.settings.child('detector_settings',
@@ -192,19 +212,16 @@ class SpectroApp(CustomApp):
         if param.name() == "averaging":
             self.average = param.value()
         if param.name() == "pymo_averaging":
-            try:
-                self.detector.settings.child('main_settings', 'Naverage') \
-                                      .setValue(param.value())
-            except:
-                import pdb
-                pdb.set_trace()
+            self.detector.settings.child('main_settings', 'Naverage') \
+                                         .setValue(param.value())
         elif param.name() == "back_averaging":
             self.background_average = param.value()
         elif param.name() == "measurement_mode":
             self.measurement_mode = self.measurement_modes[param.value()]
 
-        self.adjust_operation()
-        self.adjust_actions()
+        if hasattr(self, 'measurement_mode'):
+            self.adjust_operation()
+            self.adjust_actions()
 
     def adjust_operation(self):
         """Stop acquisition if background / reference is missing but needed"""
@@ -436,10 +453,7 @@ class SpectroApp(CustomApp):
     def clean_up(self):
         self.detector.quit_fun()
         QApplication.processEvents()
-        self.qt_settings.setValue("geometry", self.mainwindow.saveGeometry())
-        self.qt_settings.setValue("dockarea", self.dockarea.saveState())
-        self.qt_settings.setValue("settings-header-0",
-                          self._settings_tree.widget.header().sectionSize(0))
+        self.write_settings(self.qt_settings)
 
 
 def main(prog):
