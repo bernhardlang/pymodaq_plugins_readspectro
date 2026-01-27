@@ -259,8 +259,7 @@ class SpectroApp(CustomApp):
 
     def take_data(self, data: DataToExport):
         data1D = data.get_data_from_dim('Data1D')
-        if not hasattr(self, 'wavelengths'):
-            self.wavelengths = data1D.data[0].axes[0]
+        self.wavelengths = data1D.data[0].axes[0]
         self.n_samples = self.accumulate_data(data[0][0], self.n_samples)
         if self.n_samples <= self.n_average:
             return
