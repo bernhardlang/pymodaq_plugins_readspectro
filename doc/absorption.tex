@@ -1,0 +1,33 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage{a4wide,amsmath}
+\newcommand{\ind}[2]{#1_{\mathrm{#2}}}
+\parindent=0cm
+\begin{document}
+Absorption
+\begin{equation}
+  A = -\log_{10}\frac{\ind I{raw} - B}{I_0}
+\end{equation}
+$B$ background, $I = \ind I{raw} - B$, $I_0 = \ind I{0,raw} - B$
+
+\begin{subequations}
+  \begin{align}
+    \frac{\partial A}{\partial I}
+    &= -\frac1{\ln10}\cdot\frac1{\ind I{raw} - B} \\
+    \frac{\partial A}{\partial I_0}
+    &= \frac1{\ln10}\cdot\frac1{I_0} \\
+    \frac{\partial A}{\partial B}
+    &= \frac1{\ln10}\left(\frac1I - \frac1{I_0}\right) \\
+  \end{align}
+\end{subequations}
+
+\begin{equation}
+  \epsilon_{I_0} = \sqrt{\epsilon_{\ind I{0,raw}}^2 + \epsilon_B^2}
+\end{equation}
+\begin{equation}
+  \epsilon_A
+  = \frac1{\ln10}\sqrt{\frac{\epsilon_{\ind I{raw}}^2}{I^2}
+    + \frac{\epsilon_{\ind I{raw}}^2 + \epsilon_B^2}{I_0^2}
+    + \left(\frac1I - \frac1{I_0}\right)^2\epsilon_B^2}
+\end{equation}
+
+\end{document}

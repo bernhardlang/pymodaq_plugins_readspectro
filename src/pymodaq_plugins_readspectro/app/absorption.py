@@ -259,6 +259,8 @@ class SpectroApp(CustomApp):
 
     def take_data(self, data: DataToExport):
         data1D = data.get_data_from_dim('Data1D')
+        if not hasattr(self, 'wavelengths'):
+            self.wavelengths = data1D.data[0].axes[0]
         self.n_samples = self.accumulate_data(data[0][0], self.n_samples)
         if self.n_samples <= self.n_average:
             return
@@ -295,7 +297,7 @@ class SpectroApp(CustomApp):
 
     def show_data(self, mean, error, name, raw=None, reference=None):
         dfp = DataFromPlugins(name=name, data=[mean, error], dim='Data1D',
-                              labels=[name, 'error'])
+                              labels=[name, 'error'], axes=[self.wavelengths])
         self.spectrum_viewer.show_data(dfp)
         if raw is not None:
             data = [raw]
@@ -304,7 +306,7 @@ class SpectroApp(CustomApp):
                 data.append(reference)
                 labels.append('reference')
             dfp = DataFromPlugins(name='raw', data=data, dim='Data1D',
-                                  labels=labels)
+                                  labels=labels, axes=[self.wavelengths])
             self.raw_data_viewer.show_data(dfp)
 
     def start_acquiring(self):
